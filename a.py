@@ -1,4 +1,3 @@
-# n.py (voice-enabled version)
 import streamlit as st
 import pandas as pd
 import datetime
@@ -6,10 +5,7 @@ from groq import Groq
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import bcrypt
-import os
-from audio_recorder_streamlit import audio_recorder
-# utils.py should provide: speech_to_text, text_to_speech, autoplay_audio
-from utils import speech_to_text, text_to_speech, autoplay_audio
+
 
 # Connect to Google Sheet
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -31,15 +27,17 @@ def register_user(username, email, password):
 def login_user(username, password):
     users = sheet.get_all_records()
     for user in users:
-        # adjust column names depending on your sheet headers
-        # assume sheet columns: username, email, password_hash
-        if user.get("username") == username:
-            if bcrypt.checkpw(password.encode(), user.get("password_hash").encode()):
+        if user["username"] == username:
+            if bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
                 return True
     return False
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+
+
+
+
 
 # ---------- LOAD API KEY ----------
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
@@ -85,6 +83,7 @@ If the user asks anything NOT related to emotional or mental well-being
 
 MODEL_NAME = "llama-3.1-8b-instant"
 
+
 # ---------- MEMORY ----------
 def update_memory(history, current_memory):
     if len(history) < 6 or len(history) % 4 != 0:
@@ -110,6 +109,7 @@ Conversation:
 
     return completion.choices[0].message.content.strip()
 
+
 # ---------- UI CONFIG ----------
 st.set_page_config(
     page_title="MindCare Companion",
@@ -118,10 +118,132 @@ st.set_page_config(
     initial_sidebar_state="auto"
 )
 
-st.markdown(""" ... (your custom CSS here) ... """, unsafe_allow_html=True)  # keep your existing CSS blocks
+st.markdown("""
+<style>
+[data-testid="stSidebar"] {
+    min-width: 350px !important;
+    max-width: 350px !important;
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(12px) !important;
+    border-right: 2px solid rgba(255,255,255,0.3);
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# Default states
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = None
+
+# ----------------------------
+#  SIDEBAR ACCOUNT SECTION
+# ----------------------------
+with st.sidebar:
+    st.title("Account")
+
+    if st.session_state.logged_in:
+        st.success(f"Logged in as {st.session_state.username}")
+
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.session_state.username = None
+            st.rerun()
+
+    else:
+        account_action = st.selectbox("Choose", ["Continue as Guest", "Login", "Sign Up"])
+
+        if account_action == "Login":
+            st.subheader("Login")
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+
+            if st.button("Login"):
+                if login_user(username, password):
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+                    st.success("Logged in successfully!")
+                    st.rerun()
+                else:
+                    st.error("Invalid login!")
+
+        elif account_action == "Sign Up":
+            st.subheader("Create Account")
+            username = st.text_input("Create Username")
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+
+            if st.button("Sign Up"):
+                ok, msg = register_user(username, email, password)
+                if ok:
+                    st.success(msg)
+                else:
+                    st.error(msg)
+
+
+# --- SIDEBAR TOGGLE ---
+if "sidebar_state" not in st.session_state:
+    st.session_state.sidebar_state = True   # True = Expanded, False = Collapsed
+
+# Toggle button (three dots icon)
+toggle = st.button("☰", help="Toggle Menu")
+
+if toggle:
+    st.session_state.sidebar_state = not st.session_state.sidebar_state
+
+# Apply CSS based on state
+if st.session_state.sidebar_state:
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {transform: translateX(0); transition: all 0.3s;}
+    </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {transform: translateX(-350px); transition: all 0.3s;}
+    </style>
+    """, unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+button[title="Toggle Menu"] {
+    font-size: 28px !important;      /* Bigger hamburger */
+    font-weight: 700 !important;
+    padding: 10px 18px !important;   /* Comfortable click size */
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 1.5px solid #d4bfff !important;
+    cursor: pointer;
+    position: fixed;                 /* So it stays visible */
+    top: 12px;
+    left: 12px;
+    z-index: 9999;
+}
+
+/* Hover effect */
+button[title="Toggle Menu"]:hover {
+    background: #f0e5ff !important;
+    border-color: #b388ff !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+st.markdown("""
+<style>
+body {background: linear-gradient(135deg, #d6dce8, #f4e7f7);}
+#MainMenu, footer, header {visibility: hidden;}
+.big-title {text-align: center; font-size: 38px; font-weight: 900; color: #3b2b56;}
+.sub-title {text-align: center; color: #6a5b7e; font-size: 18px;}
+.glass-card {background: rgba(255,255,255,0.35); backdrop-filter: blur(12px); border-radius: 16px; padding: 25px; margin-top: 10px; box-shadow: 0 4px 28px rgba(0,0,0,0.08);}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("<h1 class='big-title'>💛 MindCare Companion</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>Here to support you gently, one conversation at a time.</p>", unsafe_allow_html=True)
+
 
 # ---------- SESSION ----------
 if "memory" not in st.session_state:
@@ -132,74 +254,106 @@ if "history" not in st.session_state:
         {"role": "assistant", "content": "Hey, I'm here with you. What’s on your mind?"}
     ]
 
-# ---------------------------- SIDEBAR (accounts, nav) ----------------------------
-if "username" not in st.session_state:
-    st.session_state.username = None
 
-with st.sidebar:
-    st.title("Account")
-    if st.session_state.logged_in:
-        st.success(f"Logged in as {st.session_state.username}")
-        if st.button("Logout"):
-            st.session_state.logged_in = False
-            st.session_state.username = None
-            st.rerun()
-    else:
-        account_action = st.selectbox("Choose", ["Continue as Guest", "Login", "Sign Up"])
-        if account_action == "Login":
-            st.subheader("Login")
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            if st.button("Login"):
-                if login_user(username, password):
-                    st.session_state.logged_in = True
-                    st.session_state.username = username
-                    st.success("Logged in successfully!")
-                    st.rerun()
-                else:
-                    st.error("Invalid login!")
-        elif account_action == "Sign Up":
-            st.subheader("Create Account")
-            username = st.text_input("Create Username")
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            if st.button("Sign Up"):
-                ok, msg = register_user(username, email, password)
-                if ok:
-                    st.success(msg)
-                else:
-                    st.error(msg)
-
+# ---------- SIDEBAR NAVIGATION ----------
 with st.sidebar:
     st.title("Menu")
     page = st.radio("Navigate", ["💬 Chat", "📝 Mood Journal", "📊 Dashboard", "🧘 Coping Tools"])
 
+
 # =========================================================
-#                         CHAT (voice-enabled)
+#                         CHAT
 # =========================================================
+
 if page == "💬 Chat":
+    import json
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     st.subheader("Talk to me")
 
-    # show conversation
+    import streamlit.components.v1 as components
+
+    st.markdown("### 🎤 Speak Instead of Typing")
+
+    voice_input_html = """
+<div style="display:flex;align-items:center;gap:10px;">
+    <input id="speech_input" type="text" placeholder="Speak or type..." 
+        style="padding:10px;font-size:16px;width:300px;border-radius:8px;border:1px solid #ccc;">
+    <button id="mic_btn"
+        style="padding:10px 15px;font-size:18px;border:none;border-radius:50%;background:#ff4b4b;color:white;cursor:pointer;">
+        🎤
+    </button>
+</div>
+
+<script>
+let recognizing = false;
+let recognition;
+
+if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-IN";
+
+    recognition.onstart = () => {
+        recognizing = true;
+        document.getElementById("mic_btn").style.background = "#1DB954";
+    };
+
+    recognition.onerror = (event) => {
+        console.log(event.error);
+    };
+
+    recognition.onend = () => {
+        recognizing = false;
+        document.getElementById("mic_btn").style.background = "#ff4b4b";
+    };
+
+    recognition.onresult = (event) => {
+        let result = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            result += event.results[i][0].transcript;
+        }
+        document.getElementById("speech_input").value = result;
+    };
+}
+
+document.getElementById("mic_btn").onclick = () => {
+    if (recognizing) {
+        recognition.stop();
+        recognizing = false;
+    } else {
+        recognition.start();
+    }
+};
+</script>
+"""
+
+    components.html(voice_input_html, height=120)
+
+
+    # Show existing conversation
     for msg in st.session_state.history:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
 
-    # text input (existing)
-    user_input = st.chat_input("Share whatever you're feeling...")
+    # TTS controls
+    tts_col1, tts_col2 = st.columns([1,1])
+    with tts_col1:
+        tts_lang = st.selectbox("TTS language", options=["en-IN", "en-US", "hi-IN"], index=0, help="Choose voice language for narration")
+    with tts_col2:
+        autoplay = st.checkbox("Autoplay reply (may require a prior user gesture)", value=False)
 
-    # voice recording container (footer-style)
-    footer_container = st.container()
-    with footer_container:
-        audio_bytes = audio_recorder()  # returns bytes if user recorded
+    # Single-line input like YouTube search (enter submits)
+    with st.form("user_input_form", clear_on_submit=True):
+        user_input = st.text_input("Your message:", key="speech_input")
 
-    # If user typed text
-    if user_input:
+        submitted = st.form_submit_button("Send")
+
+    if submitted and user_input:
         st.session_state.history.append({"role": "user", "content": user_input})
         st.session_state.memory = update_memory(st.session_state.history, st.session_state.memory)
 
-        # topic check
+        # Topic Check (reuse existing prompt style)
         check_prompt = f"""
 Classify the topic of this message:
 
@@ -229,157 +383,82 @@ If the message is about:
 • politics/news
 • finance
 • medical or health diagnosis
-• sexual instructions
-• technical knowledge questions
-
+• sexual instruction or adult content
+• illegal activity
+• factual/encyclopedic questions
 → Reply: OTHER
-
-Return only one word: MENTAL or OTHER.
 """
-
-        check = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": check_prompt}]
-        ).choices[0].message.content.strip()
+        try:
+            check = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": check_prompt}]
+            ).choices[0].message.content.strip()
+        except Exception as e:
+            check = "MENTAL"  # fallback to allow conversation
+            st.warning(f"Topic check failed, proceeding: {e}")
 
         if check != "MENTAL":
             reply = "I'm here only to help with emotional and mental well-being. If you want to share your feelings, I'm here with you. 💛"
         else:
-            prompt = f"""
-{SYSTEM_PROMPT}
-
-Memory:
-{st.session_state.memory}
-
-User: {user_input}
-Assistant:
-"""
-            reply = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[{"role": "user", "content": prompt}]
-            ).choices[0].message.content.strip()
+            prompt = f"{SYSTEM_PROMPT}\n\nMemory:\n{st.session_state.memory}\n\nUser: {user_input}\nAssistant:"
+            try:
+                reply = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=[{"role": "user", "content": prompt}]
+                ).choices[0].message.content.strip()
+            except Exception as e:
+                reply = "Sorry, I couldn't reach the assistant right now. Please try again later."
+                st.error(f"Assistant API error: {e}")
 
         st.session_state.history.append({"role": "assistant", "content": reply})
 
+        # Show reply
         with st.chat_message("assistant"):
             st.write(reply)
 
-        # generate audio response and autoplay
-        try:
-            with st.spinner("Generating audio response..."):
-                audio_file = text_to_speech(reply)  # from utils
-                autoplay_audio(audio_file)          # from utils: streamlit-friendly player
-                # remove generated audio after playing
-                try:
-                    os.remove(audio_file)
-                except:
-                    pass
-        except Exception as e:
-            # don't break chat if TTS fails
-            st.warning("Audio response unavailable.")
-
-    # If user recorded voice
-    if audio_bytes:
-        # save bytes to a temp file (mp3/webm depending on recorder output)
-        tmp_path = "temp_audio.webm"
-        try:
-            with open(tmp_path, "wb") as f:
-                f.write(audio_bytes)
-
-            with st.spinner("Transcribing..."):
-                transcript = speech_to_text(tmp_path)  # from utils
-            if transcript:
-                # display user message and continue flow exactly like text input
-                st.session_state.history.append({"role": "user", "content": transcript})
-                with st.chat_message("user"):
-                    st.write(transcript)
-
-                st.session_state.memory = update_memory(st.session_state.history, st.session_state.memory)
-
-                # Topic check & response generation (same as above)
-                check_prompt = f"""
-Classify the topic of this message:
-
-"{transcript}"
-
-If the message expresses or discusses:
-• feelings
-• emotions
-• mood
-• joy
-• sadness
-• anxiety
-• stress
-• motivation
-• love
-• loneliness
-• self-worth
-• relationships
-• personal reflection
-• mental state
-
-→ Reply: MENTAL
-
-If the message is about:
-• programming
-• math/homework
-• politics/news
-• finance
-• medical or health diagnosis
-• sexual instructions
-• technical knowledge questions
-
-→ Reply: OTHER
-
-Return only one word: MENTAL or OTHER.
-"""
-
-                check = client.chat.completions.create(
-                    model=MODEL_NAME,
-                    messages=[{"role": "user", "content": check_prompt}]
-                ).choices[0].message.content.strip()
-
-                if check != "MENTAL":
-                    reply = "I'm here only to help with emotional and mental well-being. If you want to share your feelings, I'm here with you. 💛"
-                else:
-                    prompt = f"""
-{SYSTEM_PROMPT}
-
-Memory:
-{st.session_state.memory}
-
-User: {transcript}
-Assistant:
-"""
-                    reply = client.chat.completions.create(
-                        model=MODEL_NAME,
-                        messages=[{"role": "user", "content": prompt}]
-                    ).choices[0].message.content.strip()
-
-                st.session_state.history.append({"role": "assistant", "content": reply})
-
-                with st.chat_message("assistant"):
-                    st.write(reply)
-
-                # TTS + autoplay
-                try:
-                    with st.spinner("Generating audio response..."):
-                        audio_file = text_to_speech(reply)
-                        autoplay_audio(audio_file)
-                        try:
-                            os.remove(audio_file)
-                        except:
-                            pass
-                except Exception as e:
-                    st.warning("Audio response unavailable.")
-        finally:
-            # cleanup temp upload
-            try:
-                os.remove(tmp_path)
-            except:
-                pass
+        # Client-side TTS HTML
+        escaped_text = json.dumps(reply)
+        tts_html = f"""
+        <div>
+          <button id="speak_btn">🔊 Play reply</button>
+          <button id="stop_btn">⏹ Stop</button>
+        </div>
+        <script>
+        (function() {{
+          const text = {escaped_text};
+          const lang = "{tts_lang}";
+          document.getElementById("speak_btn").onclick = () => {{
+            if (!("speechSynthesis" in window)) {{
+              alert("SpeechSynthesis not supported in this browser.");
+              return;
+            }}
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = lang;
+            window.speechSynthesis.speak(u);
+          }};
+          document.getElementById("stop_btn").onclick = () => {{
+            window.speechSynthesis.cancel();
+          }};
+          const autoplay = {json.dumps(autoplay)};
+          if (autoplay) {{
+            try {{
+              window.speechSynthesis.cancel();
+              const u2 = new SpeechSynthesisUtterance(text);
+              u2.lang = lang;
+              window.speechSynthesis.speak(u2);
+            }} catch (e) {{
+              // ignore
+            }}
+          }}
+        }})();
+        </script>
+        """
+        st.components.v1.html(tts_html, height=140)
 
     st.markdown("</div>", unsafe_allow_html=True)
+
+
 
 # =========================================================
 #                     MOOD JOURNAL
@@ -404,6 +483,7 @@ elif page == "📝 Mood Journal":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+
 # =========================================================
 #                     DASHBOARD
 # =========================================================
@@ -420,6 +500,7 @@ elif page == "📊 Dashboard":
         st.info("No entries yet. Add some from Mood Journal.")
 
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 # =========================================================
 #                     COPING TOOLS
