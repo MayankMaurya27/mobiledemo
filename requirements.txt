@@ -1,7 +1,10 @@
 streamlit>=1.26
+groq>=0.1 
 requests
 gspread
 oauth2client
 bcrypt
 pandas
 audio-recorder-streamlit
+
+
