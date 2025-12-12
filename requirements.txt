@@ -1,0 +1,9 @@
+streamlit>=1.26
+groq>=0.1          # if you use Groq SDK; replace with correct package name
+gspread
+oauth2client
+bcrypt
+pandas
+audio-recorder-streamlit==0.1.2   # the audio recorder widget package (or whatever you used)
+pydub            # if you do audio conversions locally (requires ffmpeg)
+whisper          # ONLY if you run Whisper locally (beware big model sizes)
