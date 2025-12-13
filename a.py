@@ -272,63 +272,70 @@ if page == "💬 Chat":
 
     import streamlit.components.v1 as components
 
-    st.markdown("### 🎤 Speak Instead of Typing")
-
-    voice_input_html = """
-<div style="display:flex;align-items:center;gap:10px;">
-    <input id="speech_input" type="text" placeholder="Speak or type..." 
-        style="padding:10px;font-size:16px;width:300px;border-radius:8px;border:1px solid #ccc;">
-    <button id="mic_btn"
-        style="padding:10px 15px;font-size:18px;border:none;border-radius:50%;background:#ff4b4b;color:white;cursor:pointer;">
-        🎤
-    </button>
+    mic_html = """
+<div style="margin-bottom:12px;">
+  <button id="mic_btn"
+    style="padding:10px 16px;font-size:18px;border:none;border-radius:50%;
+           background:#ff4b4b;color:white;cursor:pointer;">
+    🎤
+  </button>
+  <span id="status" style="margin-left:10px;color:#1db954;"></span>
 </div>
 
 <script>
 let recognizing = false;
 let recognition;
 
+function getStreamlitInput() {
+  return window.parent.document.querySelector(
+    'input[data-testid="stTextInput"]'
+  );
+}
+
 if ('webkitSpeechRecognition' in window) {
-    recognition = new webkitSpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = "en-IN";
+  recognition = new webkitSpeechRecognition();
+  recognition.lang = "en-IN";
+  recognition.continuous = false;
+  recognition.interimResults = true;
 
-    recognition.onstart = () => {
-        recognizing = true;
-        document.getElementById("mic_btn").style.background = "#1DB954";
-    };
+  recognition.onstart = () => {
+    recognizing = true;
+    document.getElementById("status").innerText = "Listening...";
+    document.getElementById("mic_btn").style.background = "#1DB954";
+  };
 
-    recognition.onerror = (event) => {
-        console.log(event.error);
-    };
+  recognition.onend = () => {
+    recognizing = false;
+    document.getElementById("status").innerText = "";
+    document.getElementById("mic_btn").style.background = "#ff4b4b";
+  };
 
-    recognition.onend = () => {
-        recognizing = false;
-        document.getElementById("mic_btn").style.background = "#ff4b4b";
-    };
+  recognition.onresult = (event) => {
+    let text = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      text += event.results[i][0].transcript;
+    }
 
-    recognition.onresult = (event) => {
-        let result = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            result += event.results[i][0].transcript;
-        }
-        document.getElementById("speech_input").value = result;
-    };
+    const input = getStreamlitInput();
+    if (input) {
+      input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
 }
 
 document.getElementById("mic_btn").onclick = () => {
-    if (recognizing) {
-        recognition.stop();
-        recognizing = false;
-    } else {
-        recognition.start();
-    }
+  if (!recognition) {
+    alert("Speech recognition not supported. Use Chrome.");
+    return;
+  }
+  recognizing ? recognition.stop() : recognition.start();
 };
 </script>
 """
 
-    components.html(voice_input_html, height=120)
+    components.html(mic_html, height=80)
+
 
 
     # Show existing conversation
