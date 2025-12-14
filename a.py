@@ -120,6 +120,44 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+
+/* 1. Kill Streamlit toolbar & decoration space */
+div[data-testid="stToolbar"] {
+    display: none !important;
+}
+div[data-testid="stDecoration"] {
+    display: none !important;
+}
+
+/* 2. Remove ALL top spacing from main app */
+section[data-testid="stMain"] {
+    padding-top: 0rem !important;
+}
+
+/* 3. Remove block container spacing */
+.block-container {
+    padding-top: 0rem !important;
+    margin-top: -0.5rem !important;
+}
+
+/* 4. Remove top margins from headings */
+h1, h2, h3 {
+    margin-top: 0rem !important;
+    padding-top: 0rem !important;
+}
+
+/* 5. Ensure shown content starts immediately */
+main {
+    padding-top: 0rem !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+
+st.markdown("""
+<style>
 [data-testid="stSidebar"] {
     min-width: 350px !important;
     max-width: 350px !important;
@@ -457,7 +495,6 @@ If the message is about:
         st.components.v1.html(tts_html, height=140)
 
     st.markdown("</div>", unsafe_allow_html=True)
-
 
 
 # =========================================================
