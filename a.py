@@ -6,6 +6,46 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import bcrypt
 
+import cv2
+import numpy as np
+
+# Load Haar cascade once
+FACE_CASCADE = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+)
+
+def detect_face_and_emotion(image_bytes):
+    """
+    Very lightweight emotion heuristic.
+    Returns: emotion label or None
+    """
+    # Convert image bytes to OpenCV image
+    img_array = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    faces = FACE_CASCADE.detectMultiScale(gray, 1.3, 5)
+
+    if len(faces) == 0:
+        return None, "No face detected"
+
+    # Take first detected face
+    (x, y, w, h) = faces[0]
+    face_roi = gray[y:y+h, x:x+w]
+
+    # VERY SIMPLE emotion heuristic (hackathon-safe)
+    brightness = np.mean(face_roi)
+
+    if brightness < 90:
+        emotion = "sad / low"
+    elif brightness < 130:
+        emotion = "neutral"
+    else:
+        emotion = "positive"
+
+    return emotion, "Face detected"
+
+
 
 # Connect to Google Sheet
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -303,6 +343,28 @@ with st.sidebar:
 #                         CHAT
 # =========================================================
 
+st.markdown("### 🎥 Optional Camera Check (Privacy-first)")
+st.caption(
+    "This feature is optional. The image is processed locally and never stored."
+)
+
+enable_cam = st.checkbox("Enable camera-based emotion check")
+
+detected_emotion = None
+
+if enable_cam:
+    img = st.camera_input("Capture your current expression")
+
+    if img is not None:
+        emotion, msg = detect_face_and_emotion(img.getvalue())
+
+        if emotion:
+            st.success(f"Detected emotional tone: **{emotion}**")
+            detected_emotion = emotion
+        else:
+            st.warning("No clear face detected. You can continue without this.")
+
+
 if page == "💬 Chat":
     import json
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
@@ -390,6 +452,41 @@ document.getElementById("mic_btn").onclick = () => {
     if submitted and user_input:
         st.session_state.history.append({"role": "user", "content": user_input})
         st.session_state.memory = update_memory(st.session_state.history, st.session_state.memory)
+
+    if submitted and user_input:
+     st.session_state.history.append({"role": "user", "content": user_input})
+
+    # Update memory
+     st.session_state.memory = update_memory(
+        st.session_state.history,
+        st.session_state.memory
+     )
+
+    # 🎥 OPTIONAL EMOTION CONTEXT FROM CAMERA
+     if detected_emotion:
+        emotion_context = f"The user may currently appear {detected_emotion}."
+     else:
+        emotion_context = ""
+
+    # 🔮 BUILD PROMPT WITH EMOTION CONTEXT
+        prompt = f"""
+     {SYSTEM_PROMPT}
+
+     Emotion context (optional):
+     {emotion_context}
+
+     Conversation memory:
+     {st.session_state.memory}
+
+     User: {user_input}
+     Assistant:
+     """
+
+        response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}]
+        )
+
 
         # Topic Check (reuse existing prompt style)
         check_prompt = f"""
